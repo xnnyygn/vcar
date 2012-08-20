@@ -23,7 +23,7 @@ import org.apache.commons.io.IOUtils;
  * open the online image, otherwise parse the image file field. If
  * {@code imageUrl} is not a legal URL, throw {@link IllegalImageUrlException}.
  * If failed to parse files, throw {@link ParseFileException}; if file field
- * {@code image} not found, throw {@link ImageNotFoundException}; if failed to
+ * {@code image} not found, throw {@link NoImageException}; if failed to
  * open the input of image, throw {@link ImageOpenFailureException}.
  * 
  * @author xnnyygn

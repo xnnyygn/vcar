@@ -31,7 +31,7 @@ public class ImageRetrieveForm {
       }
     }
     if (onlineImage == null && image == null) {
-      throw new ImageNotFoundException("image not found");
+      throw new NoImageException("image not found");
     }
   }
 

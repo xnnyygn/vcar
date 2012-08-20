@@ -30,6 +30,15 @@
     <servlet-name>imageShow</servlet-name>
     <url-pattern>/showImage</url-pattern>
   </servlet-mapping>
+  
+  <servlet>
+    <servlet-name>imageCropAndResize</servlet-name>
+    <servlet-class>in.xnnyygn.vcar.servlet.ImageCropAndResizeServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>imageCropAndResize</servlet-name>
+    <url-pattern>/cropAndResizeImage</url-pattern>
+  </servlet-mapping>
 
   <welcome-file-list>
     <welcome-file>index.jsp</welcome-file>
