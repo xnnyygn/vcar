@@ -13,12 +13,11 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 /**
- * Show image.
+ * SERVLET for showing image.
  * 
  * @author xnnyygn
  */
@@ -30,30 +29,31 @@ public class ImageShowServlet extends HttpServlet {
   @Override
   protected void doGet(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
-    File vcarFile = findVcarFile(request.getParameter("vcarId"));
-    if (vcarFile != null) {
-      IOUtils.copy(new FileInputStream(vcarFile), response.getOutputStream());
-    } else {
+    String vcarId = request.getParameter("vcarId");
+    if (!ImageLocator.getInstance().exists(vcarId)
+        || !copyImage(ImageLocator.getInstance().locate(vcarId), response)) {
       response.sendError(HttpServletResponse.SC_NOT_FOUND);
     }
   }
 
   /**
-   * Find VCAR file.
+   * Copy image to HTTP response. If failed to copy, log the cause.
    * 
-   * @param vcarId VCAR id, may be {@code null}
-   * @return file or {@code null} if {@code vcarId} is blank, file not exists,
-   *         not a file, cannot read
+   * @param image image file
+   * @param response HTTP response
+   * @return {@code true} if OK, otherwise {@code false}
+   * @see IOUtils#copy(java.io.InputStream, java.io.OutputStream)
+   * @see HttpServletResponse#getOutputStream()
    */
-  private File findVcarFile(String vcarId) {
-    if (logger.isDebugEnabled()) {
-      logger.debug("vcarId = " + vcarId);
+  private boolean copyImage(File image, HttpServletResponse response) {
+    try {
+      IOUtils.copy(new FileInputStream(image), response.getOutputStream());
+      return true;
+    } catch (IOException e) {
+      logger.error("failed to copy image [" + image.getAbsolutePath()
+          + "] to response", e);
     }
-    if (StringUtils.isNotBlank(vcarId)) {
-      File file = new File("/tmp/vcar-" + vcarId);
-      if (file.exists() && file.isFile() && file.canRead()) return file;
-    }
-    return null;
+    return false;
   }
 
 }

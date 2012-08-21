@@ -45,7 +45,7 @@ public class ImageRetrieveServlet extends HttpServlet {
     String vcarId = ImageLocator.getInstance().newVcarId();
     InvocationResult retrieveResult = retrieve(request, vcarId);
     if (retrieveResult.isSuccess()) {
-      response.sendRedirect(request.getContextPath() + "/vcar.jsp?vcarId="
+      response.sendRedirect(request.getContextPath() + "/editImage?vcarId="
           + vcarId);
     } else {
       request.setAttribute("errorMessage",

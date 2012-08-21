@@ -23,6 +23,15 @@
   </servlet-mapping>
   
   <servlet>
+    <servlet-name>imageEdit</servlet-name>
+    <servlet-class>in.xnnyygn.vcar.servlet.ImageEditServlet</servlet-class>
+  </servlet>
+  <servlet-mapping>
+    <servlet-name>imageEdit</servlet-name>
+    <url-pattern>/editImage</url-pattern>
+  </servlet-mapping>
+  
+  <servlet>
     <servlet-name>imageShow</servlet-name>
     <servlet-class>in.xnnyygn.vcar.servlet.ImageShowServlet</servlet-class>
   </servlet>
