@@ -1,5 +1,7 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8"
 	pageEncoding="UTF-8"%>
+<%@ taglib prefix="c" uri="http://java.sun.com/jsp/jstl/core" %>
+<c:set var="ctx" value="${pageContext.request.contextPath}" />
 <!DOCTYPE html>
 <html>
   <head>
@@ -7,7 +9,10 @@
     <title>Enter Online Image URL or Upload</title>
   </head>
   <body>
-    <form action="${pageContext.request.contextPath}/retrieveImage" method="post" enctype="multipart/form-data">
+    <c:if test="${!(empty errorMessage)}">
+        <p><c:out value="${errorMessage}" /></p>
+    </c:if>
+    <form action="${ctx}/retrieveImage" method="post" enctype="multipart/form-data">
       <fieldset>
         <legend>Enter Online Image URL or Upload</legend>
         <label for="imageUrl">Image URL</label>

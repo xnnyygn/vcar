@@ -9,7 +9,7 @@ package in.xnnyygn.vcar.servlet;
  * 
  * @author xnnyygn
  */
-public class NoImageException extends VcarRuntimeException {
+public class NoImageException extends VcarException {
 
   private static final long serialVersionUID = 2076140003308534484L;
 

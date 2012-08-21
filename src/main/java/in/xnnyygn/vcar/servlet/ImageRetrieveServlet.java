@@ -4,22 +4,31 @@
 package in.xnnyygn.vcar.servlet;
 
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.util.UUID;
+import java.io.InputStream;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.apache.commons.fileupload.FileItem;
+import org.apache.commons.fileupload.FileUploadException;
+import org.apache.commons.fileupload.disk.DiskFileItemFactory;
+import org.apache.commons.fileupload.servlet.ServletFileUpload;
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 
 /**
- * Servlet to retrieve image.
+ * SERVLET to retrieve image.
  * 
  * @author xnnyygn
  */
@@ -27,17 +36,20 @@ public class ImageRetrieveServlet extends HttpServlet {
 
   private static final Log logger = LogFactory.getLog("main");
   private static final long serialVersionUID = -6912621737271443097L;
-  private ImageRetriever retriever = new ImageRetriever();
+  private final ServletFileUpload servletFileUpload = new ServletFileUpload(
+      new DiskFileItemFactory());
 
   @Override
   protected void doPost(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
-    String vcarId = UUID.randomUUID().toString();
-    if (retrieve(request, vcarId)) {
+    String vcarId = ImageLocator.getInstance().newVcarId();
+    InvocationResult retrieveResult = retrieve(request, vcarId);
+    if (retrieveResult.isSuccess()) {
       response.sendRedirect(request.getContextPath() + "/vcar.jsp?vcarId="
           + vcarId);
     } else {
-      request.setAttribute("error", true);
+      request.setAttribute("errorMessage",
+          ((InvocationResult.Failure) retrieveResult).getMessage());
       getServletContext().getRequestDispatcher("/index.jsp").forward(request,
           response);
     }
@@ -49,19 +61,118 @@ public class ImageRetrieveServlet extends HttpServlet {
    * @param request HTTP request
    * @param vcarId VCAR id
    * @return true if success, otherwise false
-   * @see ImageRetriever#apply(HttpServletRequest, OutputStream)
+   * @see #getImage(Map)
+   * @see #toMap(List)
+   * @see #parseFiles(HttpServletRequest)
+   * @see ImageLocator#getInputPath(String)
    */
-  private boolean retrieve(HttpServletRequest request, String vcarId) {
-    File tmp = new File("/tmp/vcar-" + vcarId);
+  private InvocationResult retrieve(HttpServletRequest request, String vcarId) {
+    File tmp = new File(ImageLocator.getInstance().getInputPath(vcarId));
+    logger.info("retrieve image to [" + tmp.getAbsolutePath() + "]");
     try {
-      retriever.apply(request, new FileOutputStream(tmp));
-      return true;
-    } catch (IllegalImageUrlException e) {
-      logger.error(e);
-    } catch (FileNotFoundException e) {
-      logger.error(e);
+      IOUtils.copy(getImage(toMap(parseFiles(request))), new FileOutputStream(
+          tmp));
+      return InvocationResult.SUCCESS;
+    } catch (Exception e) {
+      logger.error("failed to retrieve image", e);
+      return new InvocationResult.Failure(e);
     }
-    return false;
+  }
+
+  /**
+   * Get image from form fields. Form contains two fields, text field
+   * {@code imageUrl} and file field {@code image}. If the content of
+   * {@code imageUrl} is not blank, try to use the URL of image to open online
+   * image. If {@code imageUrl} is blank and {@code image} is not empty, try to
+   * open the image user uploaded. If {@code imageUrl} is blank and
+   * {@code image} is empty, which means both fields are blank, will throw
+   * {@link NoImageException}.
+   * 
+   * @param fileMap a map use field name as key, file item as value
+   * @return input stream
+   * @throws IllegalImageUrlException if {@code imageUrl} is not a legal URL
+   * @throws NoImageException if both {@code imageUrl} and {@code image} are
+   *         blank
+   */
+  private InputStream getImage(Map<String, FileItem> fileMap)
+      throws IllegalImageUrlException, NoImageException {
+    String imageUrl = fileMap.get("imageUrl").getString();
+    if (StringUtils.isNotBlank(imageUrl)) return openOnlineImage(imageUrl);
+    FileItem image = fileMap.get("image");
+    if (image.getSize() > 0) return openUploadedImage(image);
+    throw new NoImageException("no image");
+  }
+
+  /**
+   * Open uploaded image.
+   * 
+   * @param item file item
+   * @return input stream
+   * @throws ImageOpenFailureException if failed to open image
+   * @see FileItem#getInputStream()
+   */
+  private InputStream openUploadedImage(FileItem item) {
+    logger.info("open uploaded image size = [" + item.getSize() + "]");
+    try {
+      return item.getInputStream();
+    } catch (IOException e) {
+      throw new ImageOpenFailureException("failed to open image", e);
+    }
+  }
+
+  /**
+   * Open online image.
+   * 
+   * @param imageUrl image URL
+   * @return input stream
+   * @throws IllegalImageUrlException if {@code imageUrl} is not a legal URL
+   * @throws ImageOpenFailureException if failed to open online image
+   * @see URL#openStream()
+   */
+  private InputStream openOnlineImage(String imageUrl)
+      throws IllegalImageUrlException, ImageOpenFailureException {
+    logger.info("open online image [" + imageUrl + "]");
+    try {
+      return new URL(imageUrl).openStream();
+    } catch (MalformedURLException e) {
+      throw new IllegalImageUrlException(
+          "illegal image url [" + imageUrl + "]", e);
+    } catch (IOException e) {
+      throw new ImageOpenFailureException("failed to open online image ["
+          + imageUrl + "]", e);
+    }
+  }
+
+  /**
+   * Convert file item list to a map use field name as key and file item as
+   * value.
+   * 
+   * @param files file item list
+   * @return a map use field name as key and file item as value
+   */
+  private Map<String, FileItem> toMap(List<FileItem> files) {
+    Map<String, FileItem> fileMap = new HashMap<String, FileItem>();
+    for (FileItem file : files) {
+      fileMap.put(file.getFieldName(), file);
+    }
+    return fileMap;
+  }
+
+  /**
+   * Parse files from HTTP request. If failed to parse, throw
+   * {@link ParseFileException}.
+   * 
+   * @param request HTTP request
+   * @return files
+   * @see ServletFileUpload#parseRequest(HttpServletRequest)
+   */
+  @SuppressWarnings("unchecked")
+  private List<FileItem> parseFiles(HttpServletRequest request) {
+    try {
+      return servletFileUpload.parseRequest(request);
+    } catch (FileUploadException e) {
+      throw new ParseFileException("failed to parse file", e);
+    }
   }
 
 }
