@@ -1,12 +1,11 @@
 package in.xnnyygn.vcar.servlet;
 
 /**
- * Throw when failed to parse integer.
+ * Throw when failed to parse float.
  * 
  * @author xnnyygn
- * @see Integer#parseInt(String)
  */
-public class ParseIntegerException extends VcarException {
+public class ParseFloatException extends VcarException {
 
   private static final long serialVersionUID = -688941753407322462L;
 
@@ -15,7 +14,7 @@ public class ParseIntegerException extends VcarException {
    * 
    * @param message message
    */
-  public ParseIntegerException(String message) {
+  public ParseFloatException(String message) {
     super(message);
   }
 

@@ -1,8 +1,7 @@
 package in.xnnyygn.vcar.servlet;
 
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
@@ -10,9 +9,9 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import org.devlib.schmidt.imageinfo.ImageInfo;
 
 /**
  * The SERVLET to crop and resize image.
@@ -24,85 +23,121 @@ public class ImageCropAndResizeServlet extends HttpServlet {
   private static final Log logger = LogFactory
       .getLog(ImageCropAndResizeServlet.class);
   private static final long serialVersionUID = 2580954493193650852L;
+  private ImageConverter converter = new ImageMagickConverter();
 
   @Override
   protected void doPost(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
     try {
-      ImageCropAndResizeBean bean = parseBean(request);
-      logger.info("parameters: " + bean);
-      String destImagePath = "/tmp/output";
-      executeCommand(bean.toConvertCommand(destImagePath));
-      IOUtils.copy(new FileInputStream(destImagePath),
-          response.getOutputStream());
+      cropAndCopyImage(request, response);
     } catch (VcarException e) {
-    }
-  }
-
-  void executeCommand(String command) {
-    try {
-      Process process = Runtime.getRuntime().exec(command);
-      int exitValue = process.waitFor();
-      if (exitValue != 0) {
-        throw new ExecuteCommandException("failed to execute command ["
-            + command + "], error report ["
-            + IOUtils.toString(process.getErrorStream()) + "]");
-      }
+      response.sendError(HttpServletResponse.SC_BAD_REQUEST, e.getMessage());
     } catch (Exception e) {
-      throw new ExecuteCommandException("failed to execute command [" + command
-          + "]", e);
+      logger.error("failed to copy and download image", e);
+      response.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR,
+          "system error");
     }
   }
 
   /**
-   * Parse parameters to crop and resize image from HTTP request.
+   * Copy and copy image.
    * 
    * @param request HTTP request
-   * @return parameters to crop and resize image
-   * @throws SourceImageNotFoundException if source image not found
-   * @throws ParseIntegerException if one of {@code left}, {@code top},
-   *         {@code width} and {@code height} not a legal number
-   * @throws NotANonnegativeException if one of {@code left}, {@code top},
-   *         {@code width} and {@code height} is a negative number
+   * @param response HTTP response
+   * @throws ParseFloatException if {@code left}, {@code top}, {@code width} or
+   *         {@code height} is not a legal integer
+   * @throws NotANonnegativeException if {@code left}, {@code top},
+   *         {@code width} or {@code height} is negative
+   * @throws NoSuchImageException if image found by VCAR id not exist
+   * @see ImageLocator#exists(String)
+   * @see ImageConverter#crop(String, int, int, int, int)
+   * @see #copyImage(InputStream, HttpServletResponse)
    */
-  ImageCropAndResizeBean parseBean(HttpServletRequest request)
-      throws SourceImageNotFoundException, ParseIntegerException,
-      NotANonnegativeException {
-    return new ImageCropAndResizeBean(
-        getSourceImagePath(request.getParameter("vcarId")),
+  private void cropAndCopyImage(HttpServletRequest request,
+      HttpServletResponse response) throws ParseFloatException,
+      NotANonnegativeException, NoSuchImageException {
+    String vcarId = request.getParameter("vcarId");
+    if (!ImageLocator.getInstance().exists(vcarId)) {
+      throw new NoSuchImageException("no such image with vcar id [" + vcarId
+          + "]");
+    }
+    copyImage(converter.crop(vcarId,
         parseNonnegative(request.getParameter("left")),
         parseNonnegative(request.getParameter("top")),
         parseNonnegative(request.getParameter("width")),
-        parseNonnegative(request.getParameter("height")));
+        parseNonnegative(request.getParameter("height"))), response);
   }
 
-  private int parseNonnegative(String number) throws ParseIntegerException,
+  /**
+   * Copy image to client.
+   * 
+   * @param outputImage output image
+   * @param response HTTP response
+   * @throws CopyImageException if failed to copy image
+   * @see #getImageInfo(InputStream)
+   * @see IOUtils#copy(InputStream, java.io.OutputStream)
+   */
+  private void copyImage(InputStream outputImage, HttpServletResponse response)
+      throws CopyImageException {
+    ImageInfo info = getImageInfo(outputImage);
+    response.setContentType(info.getMimeType());
+    response.setHeader("Content-Disposition", "attachment;filename=image."
+        + info.getFormatName());
+    try {
+      IOUtils.copy(outputImage, response.getOutputStream());
+    } catch (IOException e) {
+      throw new CopyImageException("failed to copy image to client", e);
+    }
+  }
+
+  /**
+   * Get information of image.
+   * 
+   * @param image image
+   * @return image information
+   * @see ImageInfo#setDetermineImageNumber(boolean)
+   * @see ImageInfo#setInput(InputStream)
+   */
+  private ImageInfo getImageInfo(InputStream image) {
+    ImageInfo info = new ImageInfo();
+    info.setDetermineImageNumber(true);
+    info.setInput(image);
+    return info;
+  }
+
+  /**
+   * Parse nonnegative number from string.
+   * 
+   * @param string string, maybe {@code null}
+   * @return integer
+   * @throws ParseFloatException if failed to parse float from string
+   * @throws NotANonnegativeException if number is negative
+   * @see #parseInt(String)
+   */
+  private int parseNonnegative(String string) throws ParseFloatException,
       NotANonnegativeException {
-    int integer = parseInt(number);
+    int integer = parseInt(string);
     if (integer < 0) {
       throw new NotANonnegativeException("not a nonnegateive [" + integer + "]");
     }
     return integer;
   }
 
-  private int parseInt(String number) throws ParseIntegerException {
+  /**
+   * Parse float from string and convert to integer.
+   * 
+   * @param string string, maybe {@code null}
+   * @return integer
+   * @throws ParseFloatException if failed to parse float from string
+   * @see Float#valueOf(String)
+   * @see Float#intValue()
+   */
+  private int parseInt(String string) throws ParseFloatException {
     try {
-      return Integer.parseInt(number);
+      return Float.valueOf(string).intValue();
     } catch (NumberFormatException e) {
-      throw new ParseIntegerException("illegal integer [" + number + "]");
+      throw new ParseFloatException("illegal float [" + string + "]");
     }
-  }
-
-  private String getSourceImagePath(String vcarId)
-      throws SourceImageNotFoundException {
-    if (StringUtils.isNotBlank(vcarId)) {
-      File image = new File("/tmp/vcar-" + vcarId);
-      if (image.exists() && image.isFile() && image.canRead()) {
-        return image.getAbsolutePath();
-      }
-    }
-    throw new SourceImageNotFoundException("source image vcarId = [" + vcarId
-        + "] not found");
   }
 
 }

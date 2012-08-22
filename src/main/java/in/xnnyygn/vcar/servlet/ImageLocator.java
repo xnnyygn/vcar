@@ -74,12 +74,12 @@ public class ImageLocator {
   }
 
   /**
-   * Get path of outputed image with {@code vcarId}.
+   * Get output image with {@code vcarId}.
    * 
-   * @return path
+   * @return file
    */
-  public String getOutputPath() {
-    return base + newVcarId();
+  public File getOutputFile() {
+    return new File(base + newVcarId());
   }
 
   /**

@@ -43,6 +43,7 @@ public class ImageRetrieveServlet extends HttpServlet {
   protected void doPost(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
     String vcarId = ImageLocator.getInstance().newVcarId();
+    // TODO remove InvocationResult
     InvocationResult retrieveResult = retrieve(request, vcarId);
     if (retrieveResult.isSuccess()) {
       response.sendRedirect(request.getContextPath() + "/editImage?vcarId="
