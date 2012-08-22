@@ -13,9 +13,11 @@
     <form action="${pageContext.request.contextPath}/cropAndResizeImage" method="post">
       <fieldset>
         <legend>Visual Crop and Resize</legend>
+        <!-- 
         Width <input type="text" id="width" value="100" />
         Height <input type="text" id="height" value="100" />
         <input type="checkbox" id="keepSizeOrRatio" checked="true" />Keep Size/Keep Ratio<br />
+        -->
         <img id="pic" src="${pageContext.request.contextPath}/showImage?vcarId=${vcarId}" /><br />
         <input type="hidden" name="vcarId" value="${vcarId}" />
         <input type="hidden" name="left" />

@@ -87,6 +87,7 @@ public class ImageMagickConverter implements ImageConverter {
    * @see Process#getErrorStream()
    */
   private void executeCommand(String command) {
+    logger.info("execute command [" + command + "]");
     try {
       Process process = Runtime.getRuntime().exec(command);
       int exitValue = process.waitFor();
