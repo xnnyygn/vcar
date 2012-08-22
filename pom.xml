@@ -4,6 +4,9 @@
 	<groupId>in.xnnyygn</groupId>
 	<artifactId>vcar</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
+	<name>vcar</name>
+    <description>visual crop and resize tool</description>
+    
 	<dependencies>
 		<dependency>
 			<groupId>javax.servlet</groupId>

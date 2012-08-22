@@ -13,6 +13,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import javax.servlet.RequestDispatcher;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -43,40 +44,59 @@ public class ImageRetrieveServlet extends HttpServlet {
   protected void doPost(HttpServletRequest request, HttpServletResponse response)
       throws ServletException, IOException {
     String vcarId = ImageLocator.getInstance().newVcarId();
-    // TODO remove InvocationResult
-    InvocationResult retrieveResult = retrieve(request, vcarId);
-    if (retrieveResult.isSuccess()) {
+    try {
+      copyImage(vcarId, request);
       response.sendRedirect(request.getContextPath() + "/editImage?vcarId="
           + vcarId);
-    } else {
-      request.setAttribute("errorMessage",
-          ((InvocationResult.Failure) retrieveResult).getMessage());
-      getServletContext().getRequestDispatcher("/index.jsp").forward(request,
-          response);
+    } catch (VcarException e) {
+      sendError(e.getMessage(), request, response);
+    } catch (VcarRuntimeException e) {
+      logger.error("failed to retrieve image", e);
+      sendError("system error", request, response);
     }
   }
 
   /**
-   * Retrieve image from HTTP request and copy to specified file with VCAR id.
+   * Send error message to client.
    * 
+   * @param message message
    * @param request HTTP request
+   * @param response HTTP response
+   * @throws ServletException if SERVLET error occurred
+   * @throws IOException if IO error occurred
+   * @see RequestDispatcher#forward(javax.servlet.ServletRequest,
+   *      javax.servlet.ServletResponse)
+   */
+  private void sendError(String message, HttpServletRequest request,
+      HttpServletResponse response) throws ServletException, IOException {
+    request.setAttribute("errorMessage", message);
+    getServletContext().getRequestDispatcher("/index.jsp").forward(request,
+        response);
+  }
+
+  /**
+   * Copy image to local disk.
+   * 
    * @param vcarId VCAR id
-   * @return true if success, otherwise false
+   * @param request HTTP request
+   * @throws IllegalImageUrlException if {@code imageUrl} is not a legal URL
+   * @throws NoImageException if {@code imageUrl} and {@code image} is blank
+   * @throws CopyImageException if failed to copy image to local disk
+   * @see IOUtils#copy(InputStream, java.io.OutputStream)
    * @see #getImage(Map)
    * @see #toMap(List)
    * @see #parseFiles(HttpServletRequest)
    * @see ImageLocator#getInputPath(String)
    */
-  private InvocationResult retrieve(HttpServletRequest request, String vcarId) {
+  private void copyImage(String vcarId, HttpServletRequest request)
+      throws IllegalImageUrlException, NoImageException {
     File tmp = new File(ImageLocator.getInstance().getInputPath(vcarId));
     logger.info("retrieve image to [" + tmp.getAbsolutePath() + "]");
     try {
       IOUtils.copy(getImage(toMap(parseFiles(request))), new FileOutputStream(
           tmp));
-      return InvocationResult.SUCCESS;
-    } catch (Exception e) {
-      logger.error("failed to retrieve image", e);
-      return new InvocationResult.Failure(e);
+    } catch (IOException e) {
+      throw new CopyImageException("failed to copy image", e);
     }
   }
 
